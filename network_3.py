@@ -66,7 +66,7 @@ class NetworkPacket:
     ## convert packet to a byte string for transmission over links
     def to_byte_S(self):
         byte_S = str(self.dst).zfill(self.dst_S_length)
-        byte_S += self.priority
+        byte_S += str(self.priority)
         byte_S += self.data_S
         return byte_S
 
@@ -152,6 +152,18 @@ class Router:
     def __str__(self):
         return self.name
 
+    def print_remaining_queue(self):
+        priority = {}
+        for inf in range(len(self.intf_L)):
+            pckt = self.intf_L[inf]
+            temp = NetworkPacket.from_byte_S(pckt)
+            print(temp)
+        #     priority[temp.priority] += temp.to_byte_S()
+        #
+        # for p in priority:
+        #     print('Packets with priority ' + str(p) + ' left on router: ' + priority[p])
+
+
     ## look through the content of incoming interfaces and
     # process data and control packets
     def process_queues(self):
@@ -167,6 +179,7 @@ class Router:
             if fr.type_S == "Network":
                 p = NetworkPacket.from_byte_S(pkt_S)  # parse a packet out
                 self.process_network_packet(p, i)
+                self.print_remaining_queue()
             elif fr.type_S == "MPLS":
                 # TODO: handle MPLS frames
                 # m_fr = MPLSFrame.from_byte_S(pkt_S) #parse a frame out
@@ -174,6 +187,7 @@ class Router:
                 m_fr = p
                 # send the MPLS frame for processing
                 self.process_MPLS_frame(m_fr, i)
+                self.print_remaining_queue()
             else:
                 raise ('%s: unknown frame type: %s' % (self, fr.type))
 
