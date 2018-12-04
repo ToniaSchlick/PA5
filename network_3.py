@@ -49,6 +49,7 @@ class Interface:
 class NetworkPacket:
     ## packet encoding lengths
     dst_S_length = 5
+    priority_length = 1
 
     ##@param dst: address of the destination host
     # @param data_S: packet payload
@@ -56,7 +57,7 @@ class NetworkPacket:
     def __init__(self, dst, data_S, priority=0):
         self.dst = dst
         self.data_S = data_S
-        # TODO: add priority to the packet class
+        self.priority = priority
 
     ## called when printing the object
     def __str__(self):
@@ -65,6 +66,7 @@ class NetworkPacket:
     ## convert packet to a byte string for transmission over links
     def to_byte_S(self):
         byte_S = str(self.dst).zfill(self.dst_S_length)
+        byte_S += self.priority
         byte_S += self.data_S
         return byte_S
 
@@ -73,8 +75,9 @@ class NetworkPacket:
     @classmethod
     def from_byte_S(self, byte_S):
         dst = byte_S[0: NetworkPacket.dst_S_length].strip('0')
-        data_S = byte_S[NetworkPacket.dst_S_length:]
-        return self(dst, data_S)
+        priority = byte_S[NetworkPacket.dst_S_length: NetworkPacket.dst_S_length + NetworkPacket.priority_length]
+        data_S = byte_S[NetworkPacket.dst_S_length + NetworkPacket.priority_length:]
+        return self(dst, data_S, priority)
 
 
 ## Implements a network host for receiving and transmitting data
@@ -207,4 +210,4 @@ class Router:
             self.process_queues()
             if self.stop:
                 print(threading.currentThread().getName() + ': Ending')
-                return 
+                return
