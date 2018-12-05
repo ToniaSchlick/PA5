@@ -176,8 +176,8 @@ class Router:
                 pkt = NetworkPacket.from_byte_S(elem[1:])
                 priority_count[int(pkt.priority)] += 1
             queue_size += self.intf_L[inf].out_queue.qsize()
-        print('\n\n\n' + self.__str__() + ' has a queue length of: ' + str(queue_size))
-        print(self.__str__() + ': There are ' + str(priority_count[0]) + ' packets in the queue with priority 0.')
+        # print(self.__str__() + ' has a queue length of: ' + str(queue_size))
+        print('\n\n\n' + self.__str__() + ': There are ' + str(priority_count[0]) + ' packets in the queue with priority 0.')
         print(self.__str__() + ': There are ' + str(priority_count[1]) + ' packets in the queue with priority 1.' + '\n\n\n')
         # pass
 
