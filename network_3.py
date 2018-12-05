@@ -98,7 +98,7 @@ class Host:
     # @param data_S: data being transmitted to the network layer
     # @param priority: packet priority
     def udt_send(self, dst, data_S, priority=0):
-        pkt = NetworkPacket(dst, data_S)
+        pkt = NetworkPacket(dst, data_S, priority)
         print('%s: sending packet "%s" with priority %d' % (self, pkt, priority))
         # encapsulate network packet in a link frame (usually would be done by the OS)
         fr = LinkFrame('Network', pkt.to_byte_S())
@@ -153,15 +153,33 @@ class Router:
         return self.name
 
     def print_remaining_queue(self):
-        priority = {}
+        priority_count = {}
+        queue_size = 0
+        priority_count[0] = 0
+        priority_count[1] = 0
+        # Loop through all interfaces getting all the incoming packets
         for inf in range(len(self.intf_L)):
-            pckt = self.intf_L[inf]
-            temp = NetworkPacket.from_byte_S(pckt)
-            print(temp)
-        #     priority[temp.priority] += temp.to_byte_S()
-        #
-        # for p in priority:
-        #     print('Packets with priority ' + str(p) + ' left on router: ' + priority[p])
+            mycopy = []
+            while True:
+                 # Attempt to get the next packet and add to an interable list
+                 try:
+                     elem = self.intf_L[inf].out_queue.get(block=False)
+                 except queue.Empty:
+                     break
+                 else:
+                     mycopy.append(elem)
+            # Iterate through the copy, adding all the packets back into the list
+            for elem in mycopy:
+                self.intf_L[inf].put(elem, 'out', True)
+            # Iterate through the list, counting each priority
+            for elem in mycopy:
+                pkt = NetworkPacket.from_byte_S(elem[1:])
+                priority_count[int(pkt.priority)] += 1
+            queue_size += self.intf_L[inf].out_queue.qsize()
+        print('\n\n\n' + self.__str__() + ' has a queue length of: ' + str(queue_size))
+        print(self.__str__() + ': There are ' + str(priority_count[0]) + ' packets in the queue with priority 0.')
+        print(self.__str__() + ': There are ' + str(priority_count[1]) + ' packets in the queue with priority 1.' + '\n\n\n')
+        # pass
 
 
     ## look through the content of incoming interfaces and
@@ -179,15 +197,14 @@ class Router:
             if fr.type_S == "Network":
                 p = NetworkPacket.from_byte_S(pkt_S)  # parse a packet out
                 self.process_network_packet(p, i)
-                self.print_remaining_queue()
             elif fr.type_S == "MPLS":
+                self.print_remaining_queue()
                 # TODO: handle MPLS frames
                 # m_fr = MPLSFrame.from_byte_S(pkt_S) #parse a frame out
                 # for now, we just relabel the packet as an MPLS frame without encapsulation
                 m_fr = p
                 # send the MPLS frame for processing
                 self.process_MPLS_frame(m_fr, i)
-                self.print_remaining_queue()
             else:
                 raise ('%s: unknown frame type: %s' % (self, fr.type))
 
@@ -211,7 +228,9 @@ class Router:
         # for now forward the frame out interface 1
         try:
             fr = LinkFrame('Network', m_fr.to_byte_S())
+            # self.print_remaining_queue()
             self.intf_L[1].put(fr.to_byte_S(), 'out', True)
+            self.print_remaining_queue()
             print('%s: forwarding frame "%s" from interface %d to %d' % (self, fr, i, 1))
         except queue.Full:
             print('%s: frame "%s" lost on interface %d' % (self, m_fr, i))
