@@ -30,12 +30,30 @@ class Interface:
         except queue.Empty:
             return None
 
+    def sort_queue(self):
+        mycopy = []
+        while True:
+             # Attempt to get the next packet and add to an interable list
+             try:
+                 elem = self.out_queue.get(block=False)
+             except queue.Empty:
+                 break
+             else:
+                 mycopy.append(elem)
+        # Sort the queue
+        mycopy.sort(key = lambda x: x[NetworkPacket.dst_S_length + 1: NetworkPacket.dst_S_length + NetworkPacket.priority_length + 1], reverse = True)
+
+        # Iterate through the list, putting the packet back on the out queue
+        for elem in mycopy:
+            self.out_queue.put(elem, 'out')
+
     ##put the packet into the interface queue
     # @param pkt - Packet to be inserted into the queue
     # @param in_or_out - use 'in' or 'out' interface
     # @param block - if True, block until room in queue, if False may throw queue.Full exception
     def put(self, pkt, in_or_out, block=False):
         if in_or_out == 'out':
+            self.sort_queue()
             # print('putting packet in the OUT queue')
             self.out_queue.put(pkt, block)
         else:
@@ -177,8 +195,8 @@ class Router:
                 priority_count[int(pkt.priority)] += 1
             queue_size += self.intf_L[inf].out_queue.qsize()
         # print(self.__str__() + ' has a queue length of: ' + str(queue_size))
-        print('\n\n\n' + self.__str__() + ': There are ' + str(priority_count[0]) + ' packets in the queue with priority 0.')
-        print(self.__str__() + ': There are ' + str(priority_count[1]) + ' packets in the queue with priority 1.' + '\n\n\n')
+        print('\n\n' + self.__str__() + ': There are ' + str(priority_count[0]) + ' packets in the queue with priority 0.')
+        print(self.__str__() + ': There are ' + str(priority_count[1]) + ' packets in the queue with priority 1.' + '\n\n')
         # pass
 
 
