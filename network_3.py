@@ -41,7 +41,7 @@ class Interface:
              else:
                  mycopy.append(elem)
         # Sort the queue
-        mycopy.sort(key = lambda x: x[NetworkPacket.dst_S_length + 1: NetworkPacket.dst_S_length + NetworkPacket.priority_length + 1], reverse = True)
+        mycopy.sort(key = lambda x: x[1: MPLS_Frame.label_S_length +1 % 2], reverse = True)
 
         # Iterate through the list, putting the packet back on the out queue
         for elem in mycopy:
@@ -191,8 +191,8 @@ class Router:
                 self.intf_L[inf].put(elem, 'out', True)
             # Iterate through the list, counting each priority
             for elem in mycopy:
-                pkt = NetworkPacket.from_byte_S(elem[1:])
-                priority_count[int(pkt.priority)] += 1
+                pkt = MPLS_Frame.from_byte_S(elem[1:])
+                priority_count[int(pkt.label) % 2] += 1
             queue_size += self.intf_L[inf].out_queue.qsize()
         # print(self.__str__() + ' has a queue length of: ' + str(queue_size))
         print('\n\n' + self.__str__() + ': There are ' + str(priority_count[0]) + ' packets in the queue with priority 0.')
@@ -214,12 +214,12 @@ class Router:
             # process the packet as network, or MPLS
             if fr.type_S == "Network":
                 p = NetworkPacket.from_byte_S(pkt_S)  # parse a packet out
-                self.process_network_packet(p, i)
+                self.process_network_packet(p, i, p.priority)
             elif fr.type_S == "MPLS":
                 # TODO: handle MPLS frames
-                # m_fr = MPLSFrame.from_byte_S(pkt_S) #parse a frame out
+                m_fr = MPLS_Frame.from_byte_S(pkt_S) #parse a frame out
                 # for now, we just relabel the packet as an MPLS frame without encapsulation
-                m_fr = p
+                # m_fr = p
                 # send the MPLS frame for processing
                 self.process_MPLS_frame(m_fr, i)
             else:
@@ -228,10 +228,10 @@ class Router:
     ## process a network packet incoming to this router
     #  @param p Packet to forward
     #  @param i Incoming interface number for packet p
-    def process_network_packet(self, pkt, i):
+    def process_network_packet(self, pkt, i, priority):
         # TODO: encapsulate the packet in an MPLS frame based on self.encap_tbl_D
         # for now, we just relabel the packet as an MPLS frame without encapsulation
-        m_fr = pkt
+        m_fr = MPLS_Frame(self.encap_tbl_D[(i, priority)], pkt)
         print('%s: encapsulated packet "%s" as MPLS frame "%s"' % (self, pkt, m_fr))
         # send the encapsulated packet for processing as MPLS frame
         self.process_MPLS_frame(m_fr, i)
@@ -243,10 +243,15 @@ class Router:
         # TODO: implement MPLS forward, or MPLS decapsulation if this is the last hop router for the path
         print('%s: processing MPLS frame "%s"' % (self, m_fr))
         # for now forward the frame out interface 1
+        out_i = self.frwd_tbl_D[(i, m_fr.label)][0]
+        m_fr.label = self.frwd_tbl_D[(i, m_fr.label)][1]
+        type = 'MPLS'
+        if m_fr.label in self.decap_tbl_D:
+            type = 'Network'
+            m_fr = m_fr.get_data()
         try:
-            fr = LinkFrame('Network', m_fr.to_byte_S())
-            # self.print_remaining_queue()
-            self.intf_L[1].put(fr.to_byte_S(), 'out', True)
+            fr = LinkFrame(type, m_fr.to_byte_S())
+            self.intf_L[out_i].put(fr.to_byte_S(), 'out', True)
             self.print_remaining_queue()
             print('%s: forwarding frame "%s" from interface %d to %d' % (self, fr, i, 1))
         except queue.Full:
