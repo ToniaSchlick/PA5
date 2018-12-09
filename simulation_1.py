@@ -19,9 +19,10 @@ if __name__ == '__main__':
     object_L.append(host_2)
 
     # create routers and routing tables for connected clients (subnets)
-    encap_tbl_D = {}  # table used to encapsulate network packets into MPLS frames
-    frwd_tbl_D = {}  # table used to forward MPLS frames
-    decap_tbl_D = {}  # table used to decapsulate network packets from MPLS frames
+    encap_tbl_D = {0: '10'}     # used to encapsulate network packets into MPLS frames
+    frwd_tbl_D = {(0, '10'): (1, '20'), (1, '30'): (0, '40')}    # table used to forward MPLS frames
+    decap_tbl_D = ('40')    # table used to decapsulate network packets from MPLS frames
+
     router_a = Router(name='RA',
                       intf_capacity_L=[500, 500],
                       encap_tbl_D=encap_tbl_D,
@@ -30,9 +31,10 @@ if __name__ == '__main__':
                       max_queue_size=router_queue_size)
     object_L.append(router_a)
 
-    encap_tbl_D = {}
-    frwd_tbl_D = {}
-    decap_tbl_D = {}
+    encap_tbl_D = {1: '0'}
+    frwd_tbl_D = {(0, '20'): (1, '50'), (1, '0'): (0, '40')}
+    decap_tbl_D = ('50')
+
     router_b = Router(name='RB',
                       intf_capacity_L=[500, 100],
                       encap_tbl_D=encap_tbl_D,
