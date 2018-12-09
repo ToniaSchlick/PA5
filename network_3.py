@@ -1,6 +1,7 @@
 import queue
 import threading
 from link_3 import LinkFrame
+from time import sleep
 
 
 ## wrapper class for a queue of packets
@@ -12,6 +13,7 @@ class Interface:
         self.out_queue = queue.Queue(maxsize);
         self.capacity = capacity  # serialization rate
         self.next_avail_time = 0  # the next time the interface can transmit a packet
+        self.sorting = False
 
     ##get packet from the queue interface
     # @param in_or_out - use 'in' or 'out' interface
@@ -31,6 +33,7 @@ class Interface:
             return None
 
     def sort_queue(self):
+        self.sorting = True
         mycopy = []
         while True:
              # Attempt to get the next packet and add to an interable list
@@ -47,15 +50,19 @@ class Interface:
         for elem in mycopy:
             self.out_queue.put(elem, 'out')
 
+        self.sorting = False
+
     ##put the packet into the interface queue
     # @param pkt - Packet to be inserted into the queue
     # @param in_or_out - use 'in' or 'out' interface
     # @param block - if True, block until room in queue, if False may throw queue.Full exception
     def put(self, pkt, in_or_out, block=False):
         if in_or_out == 'out':
-            self.sort_queue()
             # print('putting packet in the OUT queue')
             self.out_queue.put(pkt, block)
+            if not self.sorting:
+                # print('Sorting.')
+                self.sort_queue()
         else:
             # print('putting packet in the IN queue')
             self.in_queue.put(pkt, block)
@@ -253,10 +260,12 @@ class Router:
             fr = LinkFrame(type, m_fr.to_byte_S())
             self.intf_L[out_i].put(fr.to_byte_S(), 'out', True)
             self.print_remaining_queue()
-            print('%s: forwarding frame "%s" from interface %d to %d' % (self, fr, i, 1))
+            print('%s: forwarding frame "%s" from interface %d to %d' % (self, fr, i, out_i))
         except queue.Full:
             print('%s: frame "%s" lost on interface %d' % (self, m_fr, i))
             pass
+
+        sleep(1)
 
     ## thread target for the host to keep forwarding data
     def run(self):

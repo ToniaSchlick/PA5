@@ -7,7 +7,7 @@ from copy import deepcopy
 
 ##configuration parameters
 router_queue_size = 0  # 0 means unlimited
-simulation_time = 10  # give the network sufficient time to execute transfers
+simulation_time = 40  # give the network sufficient time to execute transfers
 
 if __name__ == '__main__':
     object_L = []  # keeps track of objects, so we can kill their threads at the end
@@ -95,10 +95,12 @@ if __name__ == '__main__':
     #     priority = i % 2
     #     host_1.udt_send('H2', 'MESSAGE_%d_FROM_H1' % i, priority)
 
-    host_1.udt_send('H3', 'MESSAGE_FROM_H1', 0)
-    host_1.udt_send('H3', 'MESSAGE_FROM_H1', 1)
-    host_2.udt_send('H3', 'MESSAGE_FROM_H2', 1)
-    host_2.udt_send('H3', 'MESSAGE_FROM_H2', 0)
+    for i in range(5):
+        priority = i % 2
+        host_1.udt_send('H3', 'MESSAGE_%d_FROM_H1' % i, priority)
+    for i in range(5):
+        priority = 1 - (i % 2)
+        host_2.udt_send('H3', 'MESSAGE_%d_FROM_H2' % i, priority)
 
 
     # give the network sufficient time to transfer all packets before quitting
