@@ -216,7 +216,6 @@ class Router:
                 p = NetworkPacket.from_byte_S(pkt_S)  # parse a packet out
                 self.process_network_packet(p, i)
             elif fr.type_S == "MPLS":
-                self.print_remaining_queue()
                 # TODO: handle MPLS frames
                 # m_fr = MPLSFrame.from_byte_S(pkt_S) #parse a frame out
                 # for now, we just relabel the packet as an MPLS frame without encapsulation
@@ -262,3 +261,33 @@ class Router:
             if self.stop:
                 print(threading.currentThread().getName() + ': Ending')
                 return
+
+class MPLS_Frame:
+    label_S_length = 2
+    # @param dst: address of the destination host
+    # @param data_S: packet payload
+    # @param priority: packet priority
+    def __init__(self, label, pkt):
+        self.label = label
+        self.pkt = pkt
+
+    ## called when printing the object
+    def __str__(self):
+        return self.to_byte_S()
+
+    ## convert packet to a byte string for transmission over links
+    def to_byte_S(self):
+        byte_S = str(self.label)
+        byte_S += str(self.pkt.to_byte_S())
+        return byte_S
+
+    ## extract a packet object from a byte string
+    # @param byte_S: byte string representation of the packet
+    @classmethod
+    def from_byte_S(self, byte_S):
+        label = byte_S[0: MPLS_Frame.label_S_length]
+        pkt = NetworkPacket.from_byte_S(byte_S[MPLS_Frame.label_S_length:])
+        return self(label, pkt)
+
+    def get_data(self):
+        return self.pkt
