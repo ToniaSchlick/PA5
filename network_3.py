@@ -30,12 +30,30 @@ class Interface:
         except queue.Empty:
             return None
 
+    def sort_queue(self):
+        mycopy = []
+        while True:
+             # Attempt to get the next packet and add to an interable list
+             try:
+                 elem = self.out_queue.get(block=False)
+             except queue.Empty:
+                 break
+             else:
+                 mycopy.append(elem)
+        # Sort the queue
+        mycopy.sort(key = lambda x: x[NetworkPacket.dst_S_length + 1: NetworkPacket.dst_S_length + NetworkPacket.priority_length + 1], reverse = True)
+
+        # Iterate through the list, putting the packet back on the out queue
+        for elem in mycopy:
+            self.out_queue.put(elem, 'out')
+
     ##put the packet into the interface queue
     # @param pkt - Packet to be inserted into the queue
     # @param in_or_out - use 'in' or 'out' interface
     # @param block - if True, block until room in queue, if False may throw queue.Full exception
     def put(self, pkt, in_or_out, block=False):
         if in_or_out == 'out':
+            self.sort_queue()
             # print('putting packet in the OUT queue')
             self.out_queue.put(pkt, block)
         else:
@@ -49,6 +67,7 @@ class Interface:
 class NetworkPacket:
     ## packet encoding lengths
     dst_S_length = 5
+    priority_length = 1
 
     ##@param dst: address of the destination host
     # @param data_S: packet payload
@@ -56,7 +75,7 @@ class NetworkPacket:
     def __init__(self, dst, data_S, priority=0):
         self.dst = dst
         self.data_S = data_S
-        # TODO: add priority to the packet class
+        self.priority = priority
 
     ## called when printing the object
     def __str__(self):
@@ -65,6 +84,7 @@ class NetworkPacket:
     ## convert packet to a byte string for transmission over links
     def to_byte_S(self):
         byte_S = str(self.dst).zfill(self.dst_S_length)
+        byte_S += str(self.priority)
         byte_S += self.data_S
         return byte_S
 
@@ -73,8 +93,9 @@ class NetworkPacket:
     @classmethod
     def from_byte_S(self, byte_S):
         dst = byte_S[0: NetworkPacket.dst_S_length].strip('0')
-        data_S = byte_S[NetworkPacket.dst_S_length:]
-        return self(dst, data_S)
+        priority = byte_S[NetworkPacket.dst_S_length: NetworkPacket.dst_S_length + NetworkPacket.priority_length]
+        data_S = byte_S[NetworkPacket.dst_S_length + NetworkPacket.priority_length:]
+        return self(dst, data_S, priority)
 
 
 ## Implements a network host for receiving and transmitting data
@@ -95,7 +116,7 @@ class Host:
     # @param data_S: data being transmitted to the network layer
     # @param priority: packet priority
     def udt_send(self, dst, data_S, priority=0):
-        pkt = NetworkPacket(dst, data_S)
+        pkt = NetworkPacket(dst, data_S, priority)
         print('%s: sending packet "%s" with priority %d' % (self, pkt, priority))
         # encapsulate network packet in a link frame (usually would be done by the OS)
         fr = LinkFrame('Network', pkt.to_byte_S())
@@ -149,6 +170,36 @@ class Router:
     def __str__(self):
         return self.name
 
+    def print_remaining_queue(self):
+        priority_count = {}
+        queue_size = 0
+        priority_count[0] = 0
+        priority_count[1] = 0
+        # Loop through all interfaces getting all the incoming packets
+        for inf in range(len(self.intf_L)):
+            mycopy = []
+            while True:
+                 # Attempt to get the next packet and add to an interable list
+                 try:
+                     elem = self.intf_L[inf].out_queue.get(block=False)
+                 except queue.Empty:
+                     break
+                 else:
+                     mycopy.append(elem)
+            # Iterate through the copy, adding all the packets back into the list
+            for elem in mycopy:
+                self.intf_L[inf].put(elem, 'out', True)
+            # Iterate through the list, counting each priority
+            for elem in mycopy:
+                pkt = NetworkPacket.from_byte_S(elem[1:])
+                priority_count[int(pkt.priority)] += 1
+            queue_size += self.intf_L[inf].out_queue.qsize()
+        # print(self.__str__() + ' has a queue length of: ' + str(queue_size))
+        print('\n\n' + self.__str__() + ': There are ' + str(priority_count[0]) + ' packets in the queue with priority 0.')
+        print(self.__str__() + ': There are ' + str(priority_count[1]) + ' packets in the queue with priority 1.' + '\n\n')
+        # pass
+
+
     ## look through the content of incoming interfaces and
     # process data and control packets
     def process_queues(self):
@@ -165,6 +216,7 @@ class Router:
                 p = NetworkPacket.from_byte_S(pkt_S)  # parse a packet out
                 self.process_network_packet(p, i)
             elif fr.type_S == "MPLS":
+                self.print_remaining_queue()
                 # TODO: handle MPLS frames
                 # m_fr = MPLSFrame.from_byte_S(pkt_S) #parse a frame out
                 # for now, we just relabel the packet as an MPLS frame without encapsulation
@@ -194,7 +246,9 @@ class Router:
         # for now forward the frame out interface 1
         try:
             fr = LinkFrame('Network', m_fr.to_byte_S())
+            # self.print_remaining_queue()
             self.intf_L[1].put(fr.to_byte_S(), 'out', True)
+            self.print_remaining_queue()
             print('%s: forwarding frame "%s" from interface %d to %d' % (self, fr, i, 1))
         except queue.Full:
             print('%s: frame "%s" lost on interface %d' % (self, m_fr, i))
@@ -207,4 +261,4 @@ class Router:
             self.process_queues()
             if self.stop:
                 print(threading.currentThread().getName() + ': Ending')
-                return 
+                return
